@@ -7,14 +7,21 @@ A web simulator of satellites flying in circles. I wrote it to prove to myself t
 Try it [here](https://maseuko.pl/soft/periapsis/).
 
 ### Building
-Make sure you have npm installed
+Make sure you have npm installed, then just clone the repo and install dependencies
 
-`git clone https://github.com/izawartka/periapsis`
-`cd periapsis`
-`npm install`
-`npm start` - run
-or
-`npm run build` - build
+```
+git clone https://github.com/izawartka/periapsis
+cd periapsis
+npm install
+```
+run by:
+```
+npm start
+```
+build by:
+```
+npm run build
+```
 
 ### Author
 masuo / izawartka
