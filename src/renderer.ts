@@ -2,7 +2,9 @@ import Settings from "./settings";
 import Camera from "./camera";
 import Vector2 from "./vector2";
 import World from "./world";
-import SpaceCraft from "./spacecraft";
+import SpaceCraft from "./spaceCraft";
+import OrbitalPos from "./orbitalPos";
+import Planet from "./planet";
 
 export default class Renderer {
     world!: World;
@@ -120,8 +122,13 @@ export default class Renderer {
 
         this.checkBooster();
  
-        this.drawPlanet();
-        this.drawSpaceCrafts();
+        for(const planet of this.world.planets) {
+            this.drawPlanet(planet);
+        }
+
+        for(const spaceCraft of this.world.spaceCrafts) {
+            this.drawSpaceCraft(spaceCraft);
+        }
     }
 
     worldToScreenVector(vector : Vector2) : Vector2 {
@@ -143,7 +150,7 @@ export default class Renderer {
             return;
         }
 
-        const spacecraftScreenPos = this.worldToScreenVector(spacecraft.orbit.position);
+        const spacecraftScreenPos = this.worldToScreenVector(spacecraft.position);
         const vector = this.lastMousePos.sub(spacecraftScreenPos).normalize();
         spacecraft.booster = vector.scale(Settings.world.spaceCraft.boosterForce);
 
@@ -152,8 +159,7 @@ export default class Renderer {
         }
     }
 
-    drawPlanet() {
-        const planet = this.world.planet;
+    drawPlanet(planet : Planet) {
         const planetScreenPos = this.worldToScreenVector(planet.position);
         const planetRadius = planet.radius * this.camera.zoom;
 
@@ -163,46 +169,48 @@ export default class Renderer {
         this.ctx.fill();
     }
 
-    drawSpaceCrafts() {
-        this.world.spaceCrafts.forEach(spacecraft => {
-            const isCurrent = spacecraft == this.world!.currentSpaceCraft;
-            const color = isCurrent ? Settings.colors.currentSpaceCraft : Settings.colors.otherSpaceCrafts;
-            const screenPos = this.worldToScreenVector(spacecraft.simplePhys.position);
+    drawSpaceCraft(spaceCraft : SpaceCraft) {
+        const isCurrent = spaceCraft == this.world!.currentSpaceCraft;
+        const color = isCurrent ? Settings.colors.currentSpaceCraft : Settings.colors.otherSpaceCrafts;
+        const screenPos = this.worldToScreenVector(spaceCraft.position);
 
-            this.ctx.fillStyle = color;
-            this.ctx.beginPath();
-            this.ctx.arc(screenPos.x, screenPos.y, spacecraft.size, 0, 2 * Math.PI);
-            this.ctx.fill();
+        this.ctx.fillStyle = color;
+        this.ctx.beginPath();
+        this.ctx.arc(screenPos.x, screenPos.y, spaceCraft.size, 0, 2 * Math.PI);
+        this.ctx.fill();
 
-            if(this.showVectors) {
-                this.drawSpaceCraftVector(
-                    spacecraft, 
-                    spacecraft.simplePhys.velocity.scale(Settings.shownVelocityScale),
-                    Settings.colors.velocity
-                );
-    
-                this.drawSpaceCraftVector(
-                    spacecraft,
-                    spacecraft.orbit.getGravity().scale(Settings.shownForceScale),
-                    Settings.colors.gravity
-                );
-    
-                this.drawSpaceCraftVector(
-                    spacecraft,
-                    spacecraft.booster.scale(Settings.shownForceScale),
-                    Settings.colors.booster
-                );
-            }
+        if(spaceCraft.crashedOrbit) {
+            return;
+        }
 
-            if(this.showOrbits) {
-                this.drawOrbit(spacecraft);
-            }
-        });
+        if(this.showVectors) {
+            this.drawSpaceCraftVector(
+                spaceCraft, 
+                spaceCraft.velocity.scale(Settings.shownVelocityScale),
+                Settings.colors.velocity
+            );
+
+            this.drawSpaceCraftVector(
+                spaceCraft,
+                this.world.getGravity(spaceCraft.position).scale(Settings.shownForceScale),
+                Settings.colors.gravity
+            );
+
+            this.drawSpaceCraftVector(
+                spaceCraft,
+                spaceCraft.booster.scale(Settings.shownForceScale),
+                Settings.colors.booster
+            );
+        }
+
+        if(this.showOrbits) {
+            this.drawOrbit(spaceCraft.mainOrbit, isCurrent);
+        }
     }
 
     drawSpaceCraftVector(spacecraft : SpaceCraft, vector : Vector2, color : string) {
-        const spacecraftScreenPos = this.worldToScreenVector(spacecraft.orbit.position);
-        const endScreenPos = this.worldToScreenVector(spacecraft.orbit.position.add(vector));
+        const spacecraftScreenPos = this.worldToScreenVector(spacecraft.position);
+        const endScreenPos = this.worldToScreenVector(spacecraft.position.add(vector));
 
         this.ctx.strokeStyle = color;
         this.ctx.lineWidth = 1;
@@ -212,39 +220,66 @@ export default class Renderer {
         this.ctx.stroke();
     }
 
-    drawOrbit(spacecraft : SpaceCraft) {
-        const orbit = spacecraft.orbit;
-
-        if(orbit.isHyperbolic()) return;
-
-        const semiMajorAxis = orbit.semiMajorAxis;
-        const semiMinorAxis = orbit.getSemiMinorAxis();
+    drawOrbit(orbit: OrbitalPos | null, isCurrent: boolean = false) {
+        if(orbit === null) return;
+        
         const center = this.worldToScreenVector(orbit.centre);
-        const isCurrent = spacecraft == this.world!.currentSpaceCraft;
-
-        this.ctx.strokeStyle = Settings.colors.otherSpaceCrafts;
-        this.ctx.lineWidth = 1;
+    
         this.ctx.strokeStyle = isCurrent ? Settings.colors.orbit : Settings.colors.otherOrbits;
-        this.ctx.beginPath();
-        this.ctx.ellipse(center.x, center.y, semiMajorAxis * this.camera.zoom, semiMinorAxis * this.camera.zoom, orbit.omega, 0, 2 * Math.PI);
-        this.ctx.stroke();
-
-        if(!isCurrent) return;
-
-        if(!orbit.periapsis.isZero()) {
+        this.ctx.lineWidth = 1;
+    
+        if (orbit.isHyperbolic()) {
+            this.ctx.beginPath();
+            const points = this.getHyperbolicPoints(orbit);
+            if (points.length > 0) {
+                this.ctx.moveTo(points[0].x, points[0].y);
+                for (let point of points) {
+                    this.ctx.lineTo(point.x, point.y);
+                }
+            }
+            this.ctx.stroke();
+        } else {
+            const semiMajorAxis = orbit.semiMajorAxis;
+            const semiMinorAxis = orbit.getSemiMinorAxis();
+    
+            this.ctx.beginPath();
+            this.ctx.ellipse(center.x, center.y, semiMajorAxis * this.camera.zoom, semiMinorAxis * this.camera.zoom, orbit.omega, 0, 2 * Math.PI);
+            this.ctx.stroke();
+        }
+    
+        if (!isCurrent) return;
+    
+        if (!orbit.periapsis.isZero()) {
             const periapsis = this.worldToScreenVector(orbit.periapsis);
             this.ctx.fillStyle = Settings.colors.periapsis;
             this.ctx.beginPath();
             this.ctx.arc(periapsis.x, periapsis.y, 3, 0, 2 * Math.PI);
             this.ctx.fill();
         }
-
-        if(!orbit.apoapsis.isZero()) {
+    
+        if (!orbit.apoapsis.isZero()) {
             const apoapsis = this.worldToScreenVector(orbit.apoapsis);
             this.ctx.fillStyle = Settings.colors.apoapsis;
             this.ctx.beginPath();
             this.ctx.arc(apoapsis.x, apoapsis.y, 3, 0, 2 * Math.PI);
             this.ctx.fill();
         }
+    }
+    
+    getHyperbolicPoints(orbit: OrbitalPos): Vector2[] {
+        const a = orbit.semiMajorAxis;
+        const points: Vector2[] = [];
+        const step = 0.01;
+        const range = 3;
+
+        for (let theta = -range; theta <= range; theta += step) {
+            const x = a * (Math.cosh(theta) - 1);
+            const y = a * Math.sqrt(orbit.eccentricity * orbit.eccentricity - 1) * Math.sinh(theta);
+
+            const wPoint = new Vector2(x, y).rotate(orbit.omega).add(orbit.periapsis);
+            points.push(this.worldToScreenVector(wPoint));
+        }
+
+        return points;
     }
 }

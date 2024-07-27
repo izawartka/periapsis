@@ -20,6 +20,8 @@ export default class InfoUI {
 
         const spacecraftIndex = this.world.spaceCrafts.indexOf(spacecraft);
         const spacecraftCount = this.world.spaceCrafts.length;
+        const vrelText = spacecraft.mainOrbit ? 
+         `${spacecraft.velocity.sub(spacecraft.mainOrbit!.planet.velocity).getMagnitude().toFixed(2)} m/s (rel)` : ' ';
         
         let html = `
             <table>
@@ -37,19 +39,22 @@ export default class InfoUI {
             </tr>
             <tr>
                 <td>Position:</td>
-                <td>${spacecraft.simplePhys.position.toString()} [m]</td>
+                <td>${spacecraft.position.toString()} [m]</td>
             </tr>
             <tr>
                 <td>Altitude:</td>
-                <td>${spacecraft.orbit.getAltitude().toFixed(2)} m</td>
+                <td>${spacecraft.getAltitude().toFixed(2)} m</td>
             </tr>
             <tr>
                 <td>Velocity:</td>
-                <td>${spacecraft.simplePhys.velocity.getMagnitude().toFixed(2)} m/s</td>
+                <td>
+                    ${spacecraft.velocity.getMagnitude().toFixed(2)} m/s (abs)<br>
+                    ${vrelText}
+                </td>
             </tr>
         `;
 
-        if(spacecraft.crashed) {
+        if(spacecraft.crashedOrbit) {
             html += "<tr><td>Crashed!</td></tr>";
         }
 

@@ -6,7 +6,7 @@ const Settings = {
     camera: {
         startPos: Vector2.zero(),
         startZoom: 2 / 100000,
-        minZoom: 1 / 1000000,
+        minZoom: 1 / 10000000,
         maxZoom: 1 / 100,
     },
     fps: 60,
@@ -31,16 +31,27 @@ const Settings = {
         periapsis: "red",
     },
     world: {
-        planet: {
-            x: 10000000,
-            y: 0,
-            radius: 6371000,
-            mass: 5.97219e+24,
-            color: "#88aaff",
-        },
+        planets: [
+            {
+                position: [0, 0],
+                velocity: [0, 0],
+                radius: 6371000,
+                mass: 5.97219e+24,
+                color: "#88aaff",
+                noPhys: true,
+            },
+            {
+                position: [-384399000, 0],
+                velocity: [0, -1022],
+                radius: 1737400,
+                mass: 7.34767309e+22,
+                color: "#888888",
+                noPhys: false,
+            }
+        ],
         gravityConstant: 6.67430e-11,
         spaceCraft: {
-            position: [10000000 + 10000000 + 6371000, 0],
+            position: [10000000 + 6371000, 0],
             velocity: [0, 5000],
             size: 5,
             color: "white",

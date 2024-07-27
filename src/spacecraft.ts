@@ -2,47 +2,41 @@ import Vector2 from './vector2';
 import World from './world';
 import OrbitalPos from './orbitalPos';
 import Settings from './settings';
-import SimplePhys from './simplePhys';
+import SpaceBody from './spaceBody';
+import Planet from './planet';
 
-export default class SpaceCraft {
+export default class SpaceCraft extends SpaceBody {
     size: number;
-    world: World;
     booster: Vector2 = new Vector2(0, 0);
-    crashed: boolean = false;
-    orbit: OrbitalPos;
-    simplePhys: SimplePhys;
+    crashedOrbit: OrbitalPos | null = null;
+    orbits: Array<OrbitalPos> = [];
 
     constructor(world: World, size: number, position: Vector2, velocity: Vector2) {
-        this.world = world;
+        super(world, position, velocity, 1);
         this.size = size;
-
-        this.simplePhys = new SimplePhys(world, position, velocity);
-        this.orbit = new OrbitalPos(world.planet);
-        this.orbit.setState(position, velocity);
     }
 
-    crash() {
-        this.crashed = true;
-        console.log('Crashed!');
+    checkCrash() {
+        for(const orbit of this.orbits) {
+            if(orbit.getAltitude() >= 0) continue;
+
+            this.crashedOrbit = orbit;
+            console.log('Crashed!');
+            break;
+        }
     }
 
     update(dt: number) {
-        if(this.crashed) return;
-
-        const doSimplePhys = !this.booster.isZero() ||
-            this.orbit.isHyperbolic() ||
-            Settings.forceSimplePhysics;
-
-        if(doSimplePhys) {
-            this.simplePhys.update(dt, this.booster);
-            this.orbit.setState(this.simplePhys.position, this.simplePhys.velocity);
-        } else {
-            this.orbit.update(dt);
-            this.simplePhys.setState(this.orbit.position, this.orbit.velocity);
+        if(this.crashedOrbit) {
+            this.position = this.crashedOrbit.planet.position.add(this.crashedOrbit.positionRel);
+            this.velocity = this.crashedOrbit.planet.velocity;
+            return;
         }
 
-        if(this.orbit.getAltitude() < 0) {
-            this.crash();
-        }
+        this.aac = this.booster;
+
+        super.updatePhys(dt);
+
+        this.checkCrash();
     }
 }

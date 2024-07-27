@@ -27,6 +27,10 @@ export default class Vector2 {
         return new Vector2(this.x, this.y);
     }
 
+    equals(v: Vector2) {
+        return this.x == v.x && this.y == v.y;
+    }
+
     isZero() {
         return this.x == 0 && this.y == 0;
     }
@@ -75,5 +79,12 @@ export default class Vector2 {
 
     cross(v: Vector2) {
         return this.x * v.y - this.y * v.x;
+    }
+
+    rotate(angle: number) {
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+
+        return new Vector2(this.x * cos - this.y * sin, this.x * sin + this.y * cos);
     }
 }

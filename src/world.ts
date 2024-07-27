@@ -1,29 +1,38 @@
 import Planet from './planet';
 import Settings from './settings';
 import Vector2 from './vector2';
-import SpaceCraft from './spacecraft';
-import OrbitalPos from './orbitalPos';
+import SpaceCraft from './spaceCraft';
+import SpaceBody from './spaceBody';
 
 export default class World {
-    planet : Planet;
+    planets : Array<Planet> = [];
     currentSpaceCraft! : SpaceCraft;
     spaceCrafts : Array<SpaceCraft> = [];
     timeScale : number = 1;
 
     constructor() {
-        this.planet = new Planet(
-            new Vector2(
-                Settings.world.planet.x,
-                Settings.world.planet.y
-            ),
-            Settings.world.planet.radius,
-            Settings.world.planet.mass,
-            Settings.world.planet.color
-        );
-
+        this.spawnPlanets();
         this.addDefaultSpaceCraft();
 
         this.timeScale = Settings.timeScale;
+    }
+
+    spawnPlanets() {
+        Settings.world.planets.forEach(planet => {
+            this.planets.push(new Planet(
+                this,
+                Vector2.fromArray(planet.position),
+                Vector2.fromArray(planet.velocity),
+                planet.radius,
+                planet.mass,
+                planet.color,
+                planet.noPhys
+            ));
+        });
+
+        this.planets.forEach(planet => {
+            planet.registerOrbits();
+        });
     }
 
     update(dt : number) {
@@ -32,6 +41,10 @@ export default class World {
 
         this.spaceCrafts.forEach(spaceCraft => {
             spaceCraft.update(dt);
+        });
+
+        this.planets.forEach(planet => {
+            planet.update(dt);
         });
     }
 
@@ -44,6 +57,7 @@ export default class World {
 
     addSpaceCraft(spaceCraft : SpaceCraft) {
         this.spaceCrafts.push(spaceCraft);
+        spaceCraft.registerOrbits();
         this.setCurrentSpaceCraft(spaceCraft);
     }
 
@@ -65,8 +79,8 @@ export default class World {
         let newSpaceCraft = new SpaceCraft(
             this,
             this.currentSpaceCraft.size,
-            this.currentSpaceCraft.simplePhys.position.clone(),
-            this.currentSpaceCraft.simplePhys.velocity.clone()
+            this.currentSpaceCraft.position.clone(),
+            this.currentSpaceCraft.velocity.clone()
         );
         this.addSpaceCraft(newSpaceCraft);
     }
@@ -81,12 +95,13 @@ export default class World {
         this.addSpaceCraft(newSpaceCraft);
     }
 
+    getGravity(position : Vector2, excludeBody : SpaceBody | null = null) : Vector2 {
+        let force = Vector2.zero();
+        this.planets.forEach(planet => {
+            if(planet == excludeBody) return;
+            force = force.add(planet.getGravity(position));
+        });
 
-    getGravity(position : Vector2) : Vector2 {
-        let direction = this.planet.position.sub(position);
-        let distanceSq = direction.getMagnitudeSq();
-        let force = Settings.world.gravityConstant * this.planet.mass / distanceSq;
-
-        return direction.normalize().scale(force);
+        return force;
     }
 }

@@ -10,6 +10,8 @@ export default class OrbitalPos {
     trueAnomaly: number;
     direction: number = 1;
 
+    positionRel!: Vector2;
+    velocityRel!: Vector2;
     position!: Vector2;
     velocity!: Vector2;
     centre!: Vector2;
@@ -28,7 +30,11 @@ export default class OrbitalPos {
     }
     
     getSemiMinorAxis() {
-        return this.semiMajorAxis * Math.sqrt(1 - this.eccentricity * this.eccentricity);
+        if(this.isHyperbolic()) {
+            return this.semiMajorAxis * Math.sqrt(this.eccentricity * this.eccentricity - 1);
+        } else {
+            return this.semiMajorAxis * Math.sqrt(1 - this.eccentricity * this.eccentricity);
+        }
     }
 
     isHyperbolic() {
@@ -40,7 +46,11 @@ export default class OrbitalPos {
     }
 
     getDistance() {
-        return this.semiMajorAxis * (1 - this.eccentricity * this.eccentricity) / (1 + this.eccentricity * Math.cos(this.trueAnomaly));
+        if(this.isHyperbolic()) {
+            return -this.semiMajorAxis * (this.eccentricity * this.eccentricity - 1) / (1 + this.eccentricity * Math.cos(this.trueAnomaly));
+        } else {
+            return this.semiMajorAxis * (1 - this.eccentricity * this.eccentricity) / (1 + this.eccentricity * Math.cos(this.trueAnomaly));
+        }
     }
 
     getAltitude() {
@@ -52,41 +62,69 @@ export default class OrbitalPos {
     }
 
     update(dt: number) {
+        if(this.isHyperbolic()) {
+            this.updateHyperbolic(dt);
+        } else {
+            this.updateParabolic(dt);
+        }
+
+        this.calcOutputs();
+    }
+
+    private updateHyperbolic(dt: number) {
+        const hyperbolicAnomaly = 2 * Math.atanh(Math.sqrt((this.eccentricity - 1) / (this.eccentricity + 1)) * Math.tan(this.trueAnomaly / 2));
+        const meanAnomaly = this.eccentricity * Math.sinh(hyperbolicAnomaly) - hyperbolicAnomaly;
+        const meanMotion = Math.sqrt(this.planet.getGravitionalParameter() / -Math.pow(this.semiMajorAxis, 3));
+        const newMeanAnomaly = meanAnomaly + meanMotion * dt * this.direction;
+        const newHyperbolicAnomaly = this.solveHyperbolicAnomaly(newMeanAnomaly, this.eccentricity);
+        let newTrueAnomaly = 2 * Math.atan(Math.sqrt((this.eccentricity + 1) / (this.eccentricity - 1)) * Math.tanh(newHyperbolicAnomaly / 2));
+        if(newTrueAnomaly < 0) newTrueAnomaly += 2*Math.PI;
+
+        this.trueAnomaly = newTrueAnomaly;
+    }
+
+    private updateParabolic(dt: number) {
         const eccentricAnomaly = 2 * Math.atan(Math.sqrt((1 - this.eccentricity) / (1 + this.eccentricity)) * Math.tan(this.trueAnomaly / 2));
         const meanAnomaly = eccentricAnomaly - this.eccentricity * Math.sin(eccentricAnomaly);
         const meanMotion = Math.sqrt(this.planet.getGravitionalParameter() / Math.pow(this.semiMajorAxis, 3));
         const newMeanAnomaly = meanAnomaly + meanMotion * dt * this.direction;
         const newEccentricAnomaly = this.solveEccentricAnomaly(newMeanAnomaly, this.eccentricity);
-        const newTrueAnomaly = 2 * Math.atan(Math.sqrt((1 + this.eccentricity) / (1 - this.eccentricity)) * Math.tan(newEccentricAnomaly / 2));
+        let newTrueAnomaly = 2 * Math.atan(Math.sqrt((1 + this.eccentricity) / (1 - this.eccentricity)) * Math.tan(newEccentricAnomaly / 2));
+        if(newTrueAnomaly < 0) newTrueAnomaly += 2*Math.PI;
 
         this.trueAnomaly = newTrueAnomaly;
-        this.calcOutputs();
     }
 
     setState(position: Vector2, velocity: Vector2) {
-        const lPosition = position.sub(this.planet.position);
-        const lVelocity = velocity.sub(this.planet.velocity);
+        if(position.equals(this.position) && velocity.equals(this.velocity)) {
+            return;
+        }
+
+        const positionRel = position.sub(this.planet.position);
+        const velocityRel = velocity.sub(this.planet.velocity);
         
-        const r = lPosition.getMagnitude();
-        const v2 = lVelocity.getMagnitudeSq();
+        const r = positionRel.getMagnitude();
+        const v2 = velocityRel.getMagnitudeSq();
         const mu = this.planet.getGravitionalParameter();
-
-        const semiMajorAxis = -(mu * r) / (r * v2 - 2 * mu);
-        const angularMomentum = lPosition.x * lVelocity.y - lPosition.y * lVelocity.x;
+        
+        const angularMomentum = positionRel.x * velocityRel.y - positionRel.y * velocityRel.x;
         const specificOrbitalEnergy = v2 / 2 - mu / r;
-
+        const semiMajorAxis = 1 / (2 / r - v2 / mu);
         const eccentricity = Math.sqrt(1 + (2 * specificOrbitalEnergy * angularMomentum * angularMomentum) / (mu * mu));
-        const eVec = lPosition.scale(v2 / mu - 1 / r).sub(lVelocity.scale(lPosition.dot(lVelocity) / mu));
+
+        const eVec = positionRel.scale(v2 / mu - 1 / r).sub(velocityRel.scale(positionRel.dot(velocityRel) / mu));
         
         const direction = angularMomentum > 0 ? 1 : -1;
 
         let omega = Math.atan2(eVec.y, eVec.x);
         if(omega < 0) omega += 2 * Math.PI;
 
-        let trueAnomaly = Math.atan2(lPosition.y, lPosition.x) - omega;
+        let trueAnomaly = Math.atan2(positionRel.y, positionRel.x) - omega;
         if(trueAnomaly < 0) trueAnomaly += 2 * Math.PI;
 
+        this.positionRel = positionRel;
         this.position = position;
+        this.velocityRel = velocityRel;
         this.velocity = velocity;
         this.semiMajorAxis = semiMajorAxis;
         this.eccentricity = eccentricity;
@@ -98,10 +136,7 @@ export default class OrbitalPos {
     }
 
     private applyOmega(vector: Vector2) {
-        return new Vector2(
-            vector.x * Math.cos(this.omega) - vector.y * Math.sin(this.omega),
-            vector.x * Math.sin(this.omega) + vector.y * Math.cos(this.omega)
-        );
+        return vector.rotate(this.omega);
     }
     
     private calcCentre() {
@@ -113,28 +148,40 @@ export default class OrbitalPos {
     }
     
     private calcPosition() {
-        const lx = this.getDistance() * Math.cos(this.trueAnomaly);
-        const ly = this.getDistance() * Math.sin(this.trueAnomaly);
-
-        this.position = this.applyOmega(new Vector2(lx, ly)).add(this.planet.position);
+        let lx, ly;
+        if (this.isHyperbolic()) {
+            lx = this.getDistance() * Math.cos(this.trueAnomaly);
+            ly = this.getDistance() * Math.sin(this.trueAnomaly);
+        } else {
+            lx = this.getDistance() * Math.cos(this.trueAnomaly);
+            ly = this.getDistance() * Math.sin(this.trueAnomaly);
+        }
+    
+        this.positionRel = this.applyOmega(new Vector2(lx, ly));
+        this.position = this.positionRel.add(this.planet.position);
         return this.position;
     }
-
+    
     private calcVelocity() {
         let mu = this.planet.getGravitionalParameter();
         let a = this.semiMajorAxis;
         let e = this.eccentricity;
         let theta = this.trueAnomaly;
 
-        // Calculate the radial and tangential velocity components
-        let Vr = this.direction * Math.sqrt(mu / a) * (e * Math.sin(theta)) / Math.sqrt(1 - e * e);
-        let Vtheta = this.direction * Math.sqrt(mu / a) * (1 + e * Math.cos(theta)) / Math.sqrt(1 - e * e);
+        let Vr, Vt;
+        if (this.isHyperbolic()) {
+            Vr = Math.sqrt(mu / -a) * (e * Math.sin(theta)) / Math.sqrt(e * e - 1);
+            Vt = Math.sqrt(mu / -a) * (1 + e * Math.cos(theta)) / Math.sqrt(e * e - 1);
+        } else {
+            Vr = Math.sqrt(mu / a) * (e * Math.sin(theta)) / Math.sqrt(1 - e * e);
+            Vt = Math.sqrt(mu / a) * (1 + e * Math.cos(theta)) / Math.sqrt(1 - e * e);
+        }
 
-        // Convert to Cartesian coordinates
-        let vx = Vr * Math.cos(theta) - Vtheta * Math.sin(theta);
-        let vy = Vr * Math.sin(theta) + Vtheta * Math.cos(theta);
+        let vx = (Vr * Math.cos(theta) - Vt * Math.sin(theta)) * this.direction;
+        let vy = (Vr * Math.sin(theta) + Vt * Math.cos(theta)) * this.direction;
 
-        this.velocity = this.applyOmega(new Vector2(vx, vy)).add(this.planet.velocity);
+        this.velocityRel = this.applyOmega(new Vector2(vx, vy));
+        this.velocity = this.velocityRel.add(this.planet.velocity);
         return this.velocity;
     }
 
@@ -164,18 +211,26 @@ export default class OrbitalPos {
 
     private solveEccentricAnomaly(meanAnomaly: number, excenticity: number) {
         let eccentricAnomaly = meanAnomaly;
-        let maxIterations = 100;
-        let iterations = 0;
-        while(iterations < maxIterations) {
+        let delta;
+        do {
             let f = eccentricAnomaly - excenticity * Math.sin(eccentricAnomaly) - meanAnomaly;
             let df = 1 - excenticity * Math.cos(eccentricAnomaly);
-            let delta = -f / df;
+            delta = -f / df;
             eccentricAnomaly += delta;
-            if(Math.abs(delta) < 1e-6) {
-                return eccentricAnomaly;
-            }
-            iterations++;
-        }
+        } while (Math.abs(delta) >= 1e-6);
         return eccentricAnomaly;
-    }    
+    }
+    
+    private solveHyperbolicAnomaly(meanAnomaly: number, eccentricity: number) {
+        let hyperbolicAnomaly = meanAnomaly;
+        let delta;
+        do {
+            let f = eccentricity * Math.sinh(hyperbolicAnomaly) - hyperbolicAnomaly - meanAnomaly;
+            let df = eccentricity * Math.cosh(hyperbolicAnomaly) - 1;
+            delta = -f / df;
+            hyperbolicAnomaly += delta;
+        } while (Math.abs(delta) >= 1e-6);
+
+        return hyperbolicAnomaly;
+    }
 }
