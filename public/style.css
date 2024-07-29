@@ -35,6 +35,8 @@ body {
 #shortcuts {
     top: 0;
     right: 0;
+    user-select: none;
+    pointer-events: none;
 }
 
 #info-ui {

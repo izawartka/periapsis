@@ -3,18 +3,21 @@ import Settings from './settings';
 import Vector2 from './vector2';
 import SpaceCraft from './spaceCraft';
 import SpaceBody from './spaceBody';
+import Camera, { CameraFocusMode } from './camera';
 
 export default class World {
     planets : Array<Planet> = [];
     currentSpaceCraft! : SpaceCraft;
     spaceCrafts : Array<SpaceCraft> = [];
     timeScale : number = 1;
+    camera: Camera;
 
     constructor() {
         this.spawnPlanets();
         this.addDefaultSpaceCraft();
 
         this.timeScale = Settings.timeScale;
+        this.camera = new Camera();
     }
 
     spawnPlanets() {
@@ -42,6 +45,27 @@ export default class World {
         this.spaceCrafts.forEach(spaceCraft => {
             spaceCraft.update(dt);
         });
+
+        this.updateCameraFocus();
+    }
+
+    updateCameraFocus() {
+        if(!this.currentSpaceCraft?.orbit) return;
+
+        let focus;
+        switch(this.camera.focusMode) {
+            case CameraFocusMode.SpaceCraft:
+                focus = this.currentSpaceCraft;
+                break;
+            case CameraFocusMode.Planet:
+                focus = this.currentSpaceCraft.orbit.planet;
+                break;
+            default:
+                return;
+        }
+
+        const deltaPos = focus.deltaPos.scale(-this.camera.zoom);
+        this.camera.position = this.camera.position.add(deltaPos);
     }
 
     setCurrentSpaceCraft(spaceCraft : SpaceCraft) {
@@ -71,13 +95,7 @@ export default class World {
     }
 
     cloneCurrentSpaceCraft() {
-        let newSpaceCraft = new SpaceCraft(
-            this,
-            this.currentSpaceCraft.size,
-            this.currentSpaceCraft.position.clone(),
-            this.currentSpaceCraft.velocity.clone(),
-            this.currentSpaceCraft.angle
-        );
+        const newSpaceCraft = this.currentSpaceCraft.clone();
         this.addSpaceCraft(newSpaceCraft);
     }
 

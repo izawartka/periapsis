@@ -16,6 +16,10 @@ export default class SpaceCraft extends SpaceBody {
         this.angle = angle;
     }
 
+    clone() {
+        return new SpaceCraft(this.world, this.size, this.position, this.velocity, this.angle);
+    }
+
     checkCrash() {
         for(const planet of this.world.planets) {
             const distance = planet.position.sub(this.position).getMagnitude();

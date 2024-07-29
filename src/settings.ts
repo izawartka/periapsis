@@ -1,4 +1,5 @@
 import Vector2 from "./vector2";
+import { CameraFocusMode } from "./camera";
 
 const Settings = {
     infoUIDivID: "info-ui",
@@ -8,6 +9,7 @@ const Settings = {
         startZoom: 2 / 100000,
         minZoom: 1 / 10000000,
         maxZoom: 1 / 100,
+        focusMode: CameraFocusMode.Planet
     },
     fps: 60,
     timeScale: 1,
@@ -50,8 +52,8 @@ const Settings = {
         ],
         gravityConstant: 6.67430e-11,
         spaceCraft: {
-            position: [10000000 + 6371000, 0],
-            velocity: [0, 4934.374021463175],
+            position: [1000000 + 6371000, 0],
+            velocity: [0, 7353.709409527417],
             angle: Math.PI,
             size: 8,
             color: "white",

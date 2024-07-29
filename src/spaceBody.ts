@@ -8,6 +8,8 @@ export default class SpaceBody {
     world: World;
     position: Vector2;
     velocity: Vector2;
+    deltaPos: Vector2 = Vector2.zero();
+    deltaVel: Vector2 = Vector2.zero();
     mass: number;
     noPhys: boolean;
     aac: Vector2 = Vector2.zero(); // additional acceleration (beside gravity)
@@ -38,6 +40,9 @@ export default class SpaceBody {
 
     protected updatePhys(dt: number) {
         if(this.noPhys) return;
+        
+        const oldPos = this.position.clone();
+        const oldVel = this.velocity.clone();
 
         if(this.orbit !== null) {
             this.position = this.position.add(this.orbit.planet.deltaPos);
@@ -58,15 +63,6 @@ export default class SpaceBody {
             }
         }
 
-        // @ts-ignore
-        if(this.angle !== undefined) {
-            // console.log(
-            //     this.world.planets[0].getGravityFromPos(this.position),
-            //     this.world.planets[1].getGravityFromPos(this.position),
-            //     this.position.sub(this.world.planets[1].position).getMagnitude()
-            // );
-        }
-
         if(mainOrbitPlanet === null) return;
 
         if(mainOrbitPlanet != this.orbit?.planet) {
@@ -83,15 +79,8 @@ export default class SpaceBody {
         this.orbit.update(dt);
         this.velocity = this.orbit.velocity;
         this.position = this.orbit.position;
-    }
-
-    protected updateSimplePhys(dt: number) {
-        const gravity = this.orbit!.planet.getGravityVector(this.position);
-        const acceleration = gravity.add(this.aac);
-        const deltaV = acceleration.scale(dt);
-        this.velocity = this.velocity.add(deltaV);
-        const deltaP = this.velocity.scale(dt);
-        this.position = this.position.add(deltaP);
-        this.orbit?.setState(this.position, this.velocity);
+        
+        this.deltaPos = this.position.sub(oldPos);
+        this.deltaVel = this.velocity.sub(oldVel);
     }
 }

@@ -1,3 +1,4 @@
+import Helper from "./helper";
 import Settings from "./settings";
 import World from "./world";
 
@@ -21,7 +22,7 @@ export default class InfoUI {
         const spacecraftIndex = this.world.spaceCrafts.indexOf(spacecraft);
         const spacecraftCount = this.world.spaceCrafts.length;
         const vrelText = spacecraft.orbit ? 
-         `${spacecraft.velocity.sub(spacecraft.orbit!.planet.velocity).getMagnitude().toFixed(2)} m/s (rel)` : ' ';
+         `${Helper.distanceString(spacecraft.orbit.velocityRel.getMagnitude())}/s (rel)` : ' ';
         
         let html = `
             <table>
@@ -43,14 +44,18 @@ export default class InfoUI {
             </tr>
             <tr>
                 <td>Altitude:</td>
-                <td>${spacecraft.getAltitude().toFixed(2)} m</td>
+                <td>${Helper.distanceString(spacecraft.getAltitude())}</td>
             </tr>
             <tr>
                 <td>Velocity:</td>
                 <td>
-                    ${spacecraft.velocity.getMagnitude().toFixed(2)} m/s (abs)<br>
+                    ${Helper.distanceString(spacecraft.velocity.getMagnitude())}/s (abs)<br>
                     ${vrelText}
                 </td>
+            </tr>
+            <tr>
+                <td>Focus mode:</td>
+                <td>${this.world.camera.getFocusModeString()}</td>
             </tr>
         `;
 

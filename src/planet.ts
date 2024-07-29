@@ -6,24 +6,12 @@ import World from './world';
 export default class Planet extends SpaceBody {
     radius: number;
     color: string;
-    deltaPos: Vector2 = Vector2.zero();
-    deltaVel: Vector2 = Vector2.zero();
 
     constructor(world: World, position: Vector2, velocity: Vector2, radius: number, mass: number, color: string, noPhys: boolean = false) {
         super(world, position, velocity, mass, noPhys);
 
         this.radius = radius;
         this.color = color;
-    }
-
-    update(dt: number) {
-        const oldPos = this.position.clone();
-        const oldVel = this.velocity.clone();
-
-        this.updatePhys(dt);
-
-        this.deltaPos = this.position.sub(oldPos);
-        this.deltaVel = this.velocity.sub(oldVel);
     }
 
     getGravitionalParameter() {

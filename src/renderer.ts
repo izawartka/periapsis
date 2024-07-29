@@ -5,11 +5,11 @@ import World from "./world";
 import SpaceCraft from "./spaceCraft";
 import OrbitalPos from "./orbitalPos";
 import Planet from "./planet";
+import Helper from "./helper";
 
 export default class Renderer {
     world!: World;
     ctx : CanvasRenderingContext2D;
-    camera : Camera;
     leftMouseDown : boolean = false;
     rightMouseDown : boolean = false;
     lastMousePos : Vector2 = new Vector2(0, 0);
@@ -23,8 +23,6 @@ export default class Renderer {
         if(!this.canvas) throw new Error("Canvas not found");
         this.ctx = this.canvas.getContext("2d") as CanvasRenderingContext2D;
 
-        this.camera = new Camera();
-
         this.canvas.addEventListener("wheel", (event) => {this.onScroll(event as WheelEvent)});
         this.canvas.addEventListener("mousedown", () => {this.onMouseDown(event as MouseEvent)});
         this.canvas.addEventListener("mouseup", () => {this.onMouseUp(event as MouseEvent)});
@@ -37,9 +35,9 @@ export default class Renderer {
 
     init(world: World) {
         this.world = world;
-        this.camera = new Camera();
         this.leftMouseDown = false;
         this.rightMouseDown = false;
+        this.world.camera.reset();
     }
     
     checkResize() {
@@ -63,7 +61,7 @@ export default class Renderer {
         }
 
         let zoomChange = Math.pow(1.1, event.deltaY / -100);
-        this.camera.zoomIn(zoomChange);
+        this.world.camera.zoomIn(zoomChange);
     }
 
     onMouseMove(event : MouseEvent) {
@@ -71,7 +69,7 @@ export default class Renderer {
 
         if(this.rightMouseDown) {      
             let vector = Vector2.fromMoveEvent(event);
-            this.camera.move(vector);
+            this.world.camera.move(vector);
         }
     }
 
@@ -94,6 +92,9 @@ export default class Renderer {
             break;
             case "x":
                 this.world.addDefaultSpaceCraft();
+            break;
+            case "f":
+                this.world.camera.toggleFocusMode();
             break;
         }
     }
@@ -132,9 +133,9 @@ export default class Renderer {
     }
 
     worldToScreenVector(vector : Vector2) : Vector2 {
-        const ccX = this.canvas.width/2 + this.camera.position.x + this.canvasRect.left;
-        const ccY = this.canvas.height/2 + this.camera.position.y + this.canvasRect.top;
-        const zoom = this.camera.zoom;
+        const ccX = this.canvas.width/2 + this.world.camera.position.x + this.canvasRect.left;
+        const ccY = this.canvas.height/2 + this.world.camera.position.y + this.canvasRect.top;
+        const zoom = this.world.camera.zoom;
 
         return new Vector2(
             vector.x * zoom + ccX,
@@ -161,7 +162,7 @@ export default class Renderer {
 
     drawPlanet(planet : Planet) {
         const planetScreenPos = this.worldToScreenVector(planet.position);
-        const planetRadius = planet.radius * this.camera.zoom;
+        const planetRadius = planet.radius * this.world.camera.zoom;
 
         this.ctx.fillStyle = planet.color;
         this.ctx.beginPath();
@@ -249,7 +250,15 @@ export default class Renderer {
             const semiMinorAxis = orbit.getSemiMinorAxis();
     
             this.ctx.beginPath();
-            this.ctx.ellipse(center.x, center.y, semiMajorAxis * this.camera.zoom, semiMinorAxis * this.camera.zoom, orbit.omega, 0, 2 * Math.PI);
+            this.ctx.ellipse(
+                center.x, 
+                center.y, 
+                semiMajorAxis * this.world.camera.zoom, 
+                semiMinorAxis * this.world.camera.zoom, 
+                orbit.omega, 
+                0, 
+                2 * Math.PI
+            );
             this.ctx.stroke();
         }
     
@@ -264,7 +273,7 @@ export default class Renderer {
             this.ctx.fill();
 
             this.ctx.font = '14px Verdana';
-            this.ctx.fillText(`${(periapsisAlt/1000).toFixed(2)} km`, periapsisScr.x + 8, periapsisScr.y + 7);
+            this.ctx.fillText(Helper.distanceString(periapsisAlt), periapsisScr.x + 8, periapsisScr.y + 7);
         }
     
         const apoapsisAlt = orbit.apoapsis.sub(orbit.planet.position).getMagnitude() - orbit.planet.radius;
@@ -276,7 +285,7 @@ export default class Renderer {
             this.ctx.fill();
 
             this.ctx.font = '14px Verdana';
-            this.ctx.fillText(`${(apoapsisAlt/1000).toFixed(2)} km`, apoapsisScr.x + 8, apoapsisScr.y + 7);
+            this.ctx.fillText(Helper.distanceString(apoapsisAlt), apoapsisScr.x + 8, apoapsisScr.y + 7);
         }
     }
     
