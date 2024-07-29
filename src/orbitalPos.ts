@@ -58,7 +58,7 @@ export default class OrbitalPos {
     }
 
     getGravity() {
-        return this.planet.getGravity(this.position);
+        return this.planet.getGravityVector(this.position);
     }
 
     update(dt: number) {

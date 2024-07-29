@@ -29,35 +29,30 @@ export default class World {
                 planet.noPhys
             ));
         });
-
-        this.planets.forEach(planet => {
-            planet.registerOrbits();
-        });
     }
 
     update(dt : number) {
         if(dt > 0.1) dt = 0.1;
         dt *= this.timeScale;
+        
+        this.planets.forEach(planet => {
+            planet.update(dt);
+        });
 
         this.spaceCrafts.forEach(spaceCraft => {
             spaceCraft.update(dt);
-        });
-
-        this.planets.forEach(planet => {
-            planet.update(dt);
         });
     }
 
     setCurrentSpaceCraft(spaceCraft : SpaceCraft) {
         if(this.currentSpaceCraft) {
-            this.currentSpaceCraft.booster = Vector2.zero();
+            this.currentSpaceCraft.aac = Vector2.zero();
         }
         this.currentSpaceCraft = spaceCraft;
     }
 
     addSpaceCraft(spaceCraft : SpaceCraft) {
         this.spaceCrafts.push(spaceCraft);
-        spaceCraft.registerOrbits();
         this.setCurrentSpaceCraft(spaceCraft);
     }
 
@@ -80,7 +75,8 @@ export default class World {
             this,
             this.currentSpaceCraft.size,
             this.currentSpaceCraft.position.clone(),
-            this.currentSpaceCraft.velocity.clone()
+            this.currentSpaceCraft.velocity.clone(),
+            this.currentSpaceCraft.angle
         );
         this.addSpaceCraft(newSpaceCraft);
     }
@@ -90,7 +86,8 @@ export default class World {
             this,
             Settings.world.spaceCraft.size,
             Vector2.fromArray(Settings.world.spaceCraft.position),
-            Vector2.fromArray(Settings.world.spaceCraft.velocity)
+            Vector2.fromArray(Settings.world.spaceCraft.velocity),
+            Settings.world.spaceCraft.angle
         );
         this.addSpaceCraft(newSpaceCraft);
     }
@@ -99,7 +96,7 @@ export default class World {
         let force = Vector2.zero();
         this.planets.forEach(planet => {
             if(planet == excludeBody) return;
-            force = force.add(planet.getGravity(position));
+            force = force.add(planet.getGravityVector(position));
         });
 
         return force;

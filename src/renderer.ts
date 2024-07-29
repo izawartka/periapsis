@@ -146,13 +146,13 @@ export default class Renderer {
         const spacecraft = this.world.currentSpaceCraft;
 
         if(!this.leftMouseDown) {
-            spacecraft.booster = Vector2.zero();
+            spacecraft.aac = Vector2.zero();
             return;
         }
 
         const spacecraftScreenPos = this.worldToScreenVector(spacecraft.position);
         const vector = this.lastMousePos.sub(spacecraftScreenPos).normalize();
-        spacecraft.booster = vector.scale(Settings.world.spaceCraft.boosterForce);
+        spacecraft.aac = vector.scale(Settings.world.spaceCraft.boosterForce);
 
         if(this.world.timeScale > Settings.maxSimplePhysicsTimeScale) {
             this.world.timeScale = Settings.maxSimplePhysicsTimeScale;
@@ -175,18 +175,24 @@ export default class Renderer {
         const screenPos = this.worldToScreenVector(spaceCraft.position);
 
         this.ctx.fillStyle = color;
+        
         this.ctx.beginPath();
-        this.ctx.arc(screenPos.x, screenPos.y, spaceCraft.size, 0, 2 * Math.PI);
+        this.ctx.translate(screenPos.x, screenPos.y);
+        this.ctx.rotate(spaceCraft.angle);
+        this.ctx.moveTo(0, -spaceCraft.size);
+        this.ctx.lineTo(spaceCraft.size, spaceCraft.size);
+        this.ctx.lineTo(-spaceCraft.size, spaceCraft.size);
         this.ctx.fill();
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-        if(spaceCraft.crashedOrbit) {
+        if(spaceCraft.crashedTo !== null) {
             return;
         }
 
         if(this.showVectors) {
             this.drawSpaceCraftVector(
                 spaceCraft, 
-                spaceCraft.velocity.scale(Settings.shownVelocityScale),
+                spaceCraft.getRelativeVelocity().scale(Settings.shownVelocityScale),
                 Settings.colors.velocity
             );
 
@@ -198,19 +204,19 @@ export default class Renderer {
 
             this.drawSpaceCraftVector(
                 spaceCraft,
-                spaceCraft.booster.scale(Settings.shownForceScale),
+                spaceCraft.aac.scale(Settings.shownForceScale),
                 Settings.colors.booster
             );
         }
 
         if(this.showOrbits) {
-            this.drawOrbit(spaceCraft.mainOrbit, isCurrent);
+            this.drawOrbit(spaceCraft.orbit, isCurrent);
         }
     }
 
     drawSpaceCraftVector(spacecraft : SpaceCraft, vector : Vector2, color : string) {
         const spacecraftScreenPos = this.worldToScreenVector(spacecraft.position);
-        const endScreenPos = this.worldToScreenVector(spacecraft.position.add(vector));
+        const endScreenPos = spacecraftScreenPos.add(vector);
 
         this.ctx.strokeStyle = color;
         this.ctx.lineWidth = 1;
@@ -249,20 +255,28 @@ export default class Renderer {
     
         if (!isCurrent) return;
     
-        if (!orbit.periapsis.isZero()) {
-            const periapsis = this.worldToScreenVector(orbit.periapsis);
+        const periapsisAlt = orbit.periapsis.sub(orbit.planet.position).getMagnitude() - orbit.planet.radius;
+        if (periapsisAlt > 0) {
+            const periapsisScr = this.worldToScreenVector(orbit.periapsis);
             this.ctx.fillStyle = Settings.colors.periapsis;
             this.ctx.beginPath();
-            this.ctx.arc(periapsis.x, periapsis.y, 3, 0, 2 * Math.PI);
+            this.ctx.arc(periapsisScr.x, periapsisScr.y, 3, 0, 2 * Math.PI);
             this.ctx.fill();
+
+            this.ctx.font = '14px Verdana';
+            this.ctx.fillText(`${(periapsisAlt/1000).toFixed(2)} km`, periapsisScr.x + 8, periapsisScr.y + 7);
         }
     
-        if (!orbit.apoapsis.isZero()) {
-            const apoapsis = this.worldToScreenVector(orbit.apoapsis);
+        const apoapsisAlt = orbit.apoapsis.sub(orbit.planet.position).getMagnitude() - orbit.planet.radius;
+        if (apoapsisAlt > 0 && !orbit.isHyperbolic()) {
+            const apoapsisScr = this.worldToScreenVector(orbit.apoapsis);
             this.ctx.fillStyle = Settings.colors.apoapsis;
             this.ctx.beginPath();
-            this.ctx.arc(apoapsis.x, apoapsis.y, 3, 0, 2 * Math.PI);
+            this.ctx.arc(apoapsisScr.x, apoapsisScr.y, 3, 0, 2 * Math.PI);
             this.ctx.fill();
+
+            this.ctx.font = '14px Verdana';
+            this.ctx.fillText(`${(apoapsisAlt/1000).toFixed(2)} km`, apoapsisScr.x + 8, apoapsisScr.y + 7);
         }
     }
     
